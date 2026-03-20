@@ -1,0 +1,67 @@
+@startuml
+title CinemaAbyss Container Diagram
+
+!includeurl https://raw.githubusercontent.com/RicardoNiepel/C4-PlantUML/master/C4_Component.puml
+
+Person(user, "User", "A user of the CinemaAbyss system. Laptop/SmartTV/Mobile")
+System(CinemaAbyssSystem, "CinemaAbyss System", "System managing movies")
+
+Container_Boundary(CinemaAbyssSystem, "CinemaAbyss System") {
+    Container(APIGateway, "API Gateway", "REST", "Gateway routing calls")
+
+    Container_Boundary(UserMicroservice, "User Microservice") {
+        Container(APIUserService, "API User Service", "Go", "Processes user calls")
+        ContainerDb(UserDatabase, "UserDatabase", "PostgreSQL", "Stores user data")
+    }
+    Container_Boundary(MovieMicroservice, "Movie Microservice") {
+        Container(APIMovieService, "API Movie Service", "Go", "Processes movies calls")
+        ContainerDb(MovieDatabase, "MovieDatabase", "PostgreSQL", "Stores movies data")
+    }
+    Container_Boundary(PaymentMicroservice, "Payment Microservice") {
+        Container(APIPaymentService, "API Payment Service", "Go", "Processes payment calls")
+        ContainerDb(PaymentDatabase, "PaymentDatabase", "PostgreSQL", "Stores payment data")
+    }
+    Container_Boundary(SubscriptionMicroservice, "Subscription Microservice") {
+        Container(APISubscriptionService, "API Subscription Service", "Go", "Processes subscription calls")
+        ContainerDb(SubscriptionDatabase, "SubscriptionDatabase", "PostgreSQL", "Stores subscription data")
+    }
+
+ContainerDb(EventSystem, "[Kafka]", "Message Broker", "topics:\n user-events\n movie-events\n payment-events")
+}
+
+System_Ext(ExtPaymentSystem, "External payment system", "External API")
+System_Ext(ExtOnlineCinema, "External Online Cinema", "Streaming system")
+ContainerDb(ExtRecommenderSystem, "Recommender System", "External Message Broker", "[RabbitMQ]")
+
+
+
+Rel(user,APIGateway,"Invokes API requests")
+
+Rel(APIGateway, APIUserService,         "/api/users/*")
+Rel(APIGateway, APIMovieService,        "/api/movies/*")
+Rel(APIGateway, APIPaymentService,      "/api/payments/*")
+Rel(APIGateway, APISubscriptionService, "/api/subscriptions/*")
+
+Rel(APIUserService,    EventSystem, "publishes\n user-events")
+Rel(APIMovieService,   EventSystem, "publishes\n movie-events")
+Rel(APIPaymentService, EventSystem, "publishes\n payment-events")
+
+Rel(EventSystem, APISubscriptionService, "consumes\n user-events\n payment-events")
+
+Rel(APIUserService,  UserDatabase,  "Reads/Writes user info")
+Rel_D(APIUserService,  ExtRecommenderSystem,  "publishes request")
+Rel_U(ExtRecommenderSystem, APIUserService, "consumes response")
+
+Rel(APIMovieService, MovieDatabase, "Reads/Writes movie info")
+Rel_D(APIMovieService, ExtOnlineCinema, "Streams video content")
+
+Rel(APIPaymentService,PaymentDatabase, "Reads/Writes payment info")
+Rel_D(APIPaymentService,ExtPaymentSystem, "invokes external API")
+
+Rel(APISubscriptionService,SubscriptionDatabase, "Reads/Writes subscription info")
+
+UserDatabase -[hidden]down-> ExtRecommenderSystem
+MovieDatabase -[hidden]down-> ExtOnlineCinema
+PaymentDatabase -[hidden]down-> ExtPaymentSystem
+
+@enduml
